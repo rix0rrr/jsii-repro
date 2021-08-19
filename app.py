@@ -1,34 +1,47 @@
 #!/usr/bin/env python3
-import os
+from aws_cdk import core, pipelines, aws_codepipeline_actions, aws_codepipeline, aws_stepfunctions
+import jsii
 
-from aws_cdk import core as cdk
 
-# For consistency with TypeScript code, `cdk` is the preferred import name for
-# the CDK's core module.  The following line also imports it as `core` for use
-# with examples from the CDK Developer's Guide, which are in the process of
-# being updated to use `cdk`.  You may delete this import if you don't need it.
-from aws_cdk import core
+@jsii.implements(pipelines.ICodePipelineActionFactory)
+class SomeStep(pipelines.Step):
+    def __init__(self, id_):
+        super().__init__(id_)
 
-from pythonpipesrepro.pythonpipesrepro_stack import PythonpipesreproStack
+    @jsii.member(jsii_name="produceAction")
+    def produce_action(
+            self, stage: aws_codepipeline.IStage,
+            options: pipelines.ProduceActionOptions,
+            # TODO why are these not passed?
+            # *,
+            # action_name, artifacts, pipeline, run_order, scope,
+            # before_self_mutation=None,
+            # code_build_defaults=None,
+            # fallback_artifact=None
+    ) -> pipelines.CodePipelineActionFactoryResult:
+        stage.add_action(
+            aws_codepipeline_actions.StepFunctionInvokeAction(
+                state_machine=aws_stepfunctions.StateMachine.from_state_machine_arn("..."),
+                action_name="foo",
+                state_machine_input=aws_codepipeline_actions.StateMachineInput.literal({"foo": "bar"}),
+                run_order=options["run_order"],
+            )
+        )
+
+        return pipelines.CodePipelineActionFactoryResult(run_orders_consumed=1)
 
 
 app = core.App()
-PythonpipesreproStack(app, "PythonpipesreproStack",
-    # If you don't specify 'env', this stack will be environment-agnostic.
-    # Account/Region-dependent features and context lookups will not work,
-    # but a single synthesized template can be deployed anywhere.
 
-    # Uncomment the next line to specialize this stack for the AWS Account
-    # and Region that are implied by the current CLI configuration.
+stage = core.Stage(app, "stage")
+stack = core.Stack(stage, "stack")
+pipeline_stack = core.Stack(app, "pipeline-stack")
+pipeline = pipelines.CodePipeline(
+    pipeline_stack,
+    "pipeline",
+    synth=pipelines.ShellStep("synth", input=pipelines.CodePipelineSource.git_hub("foo/bar", "main"), commands=["cdk synth"])
+)
 
-    #env=core.Environment(account=os.getenv('CDK_DEFAULT_ACCOUNT'), region=os.getenv('CDK_DEFAULT_REGION')),
-
-    # Uncomment the next line if you know exactly what Account and Region you
-    # want to deploy the stack to. */
-
-    #env=core.Environment(account='123456789012', region='us-east-1'),
-
-    # For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html
-    )
+pipeline.add_wave("wave").add_stage(stage, pre=[SomeStep("some")])
 
 app.synth()
