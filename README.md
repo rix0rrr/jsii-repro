@@ -1,58 +1,59 @@
-
 # Welcome to your CDK Python project!
 
-This is a blank project for Python development with CDK.
-
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
-
-This project is set up like a standard Python project.  The initialization
-process also creates a virtualenv within this project, stored under the `.venv`
-directory.  To create the virtualenv it assumes that there is a `python3`
-(or `python` for Windows) executable in your path with access to the `venv`
-package. If for any reason the automatic creation of the virtualenv fails,
-you can create the virtualenv manually.
-
-To manually create a virtualenv on MacOS and Linux:
+Jsii subclass repro:
 
 ```
-$ python3 -m venv .venv
+cdk synth
 ```
 
-After the init process completes and the virtualenv is created, you can use the following
-step to activate your virtualenv.
+Leads to
 
 ```
-$ source .venv/bin/activate
+Traceback (most recent call last):
+  File "/Users/huijbers/Temp/pythonpipesrepro/app.py", line 47, in <module>
+    app.synth()
+  File "/Users/huijbers/Temp/pythonpipesrepro/.venv/lib/python3.9/site-packages/aws_cdk/core/__init__.py", line 16432, in synth
+    return typing.cast(aws_cdk.cx_api.CloudAssembly, jsii.invoke(self, "synth", [options]))
+  File "/Users/huijbers/Temp/pythonpipesrepro/.venv/lib/python3.9/site-packages/jsii/_kernel/__init__.py", line 128, in wrapped
+    return _recursize_dereference(kernel, fn(kernel, *args, **kwargs))
+  File "/Users/huijbers/Temp/pythonpipesrepro/.venv/lib/python3.9/site-packages/jsii/_kernel/__init__.py", line 348, in invoke
+    return _callback_till_result(self, response, InvokeResponse)
+  File "/Users/huijbers/Temp/pythonpipesrepro/.venv/lib/python3.9/site-packages/jsii/_kernel/__init__.py", line 216, in _callback_till_result
+    response = kernel.sync_complete(
+  File "/Users/huijbers/Temp/pythonpipesrepro/.venv/lib/python3.9/site-packages/jsii/_kernel/__init__.py", line 386, in sync_complete
+    return self.provider.sync_complete(
+  File "/Users/huijbers/Temp/pythonpipesrepro/.venv/lib/python3.9/site-packages/jsii/_kernel/providers/process.py", line 382, in sync_complete
+    resp = self._process.send(_CompleteRequest(complete=request), response_type)
+  File "/Users/huijbers/Temp/pythonpipesrepro/.venv/lib/python3.9/site-packages/jsii/_kernel/providers/process.py", line 326, in send
+    raise JSIIError(resp.error) from JavaScriptError(resp.stack)
+jsii.errors.JSIIError: '' object has no attribute 'add_action'
 ```
 
-If you are a Windows platform, you would activate the virtualenv like this:
+
+Leading up to trace:
 
 ```
-% .venv\Scripts\activate.bat
+> {
+  "fqn": "@aws-cdk/pipelines.Step",
+  "args": [
+    "some"
+  ],
+  "overrides": [
+    {
+      "method": "produceAction",
+      "property": null,
+      "cookie": "produce_action"
+    }
+  ],
+  "interfaces": [
+    "@aws-cdk/pipelines.IFileSetProducer"
+  ],
+  "api": "create"
+}
+
+< {"callback":{"cookie":"produce_action","cbid":"jsii::callback::20000","invoke":{"objref":{"$jsii.byref":"@aws-cdk/pipelines.Step@10008"},"method":"produceAction","args":[{"$jsii.byref":"Object@10010"},{"actionName":"some","runOrder":1,"artifacts":{"$jsii.byref":"@aws-cdk/pipelines.ArtifactMap@10011"},"scope":{"$jsii.byref":"@aws-cdk/core.Construct@10012"},"fallbackArtifact":{"$jsii.byref":"@aws-cdk/aws-codepipeline.Artifact@10013"},"pipeline":{"$jsii.byref":"@aws-cdk/pipelines.CodePipeline@10006"},"codeBuildDefaults":{"buildEnvironment":{"buildImage":{"$jsii.byref":"@aws-cdk/aws-codebuild.LinuxBuildImage@10014"},"computeType":"BUILD_GENERAL1_SMALL"}},"beforeSelfMutation":false}]}}}
+> {"complete":{"cbid":"jsii::callback::20000","err":"'' object has no attribute 'add_action'","result":null,"api":"complete"}}
 ```
 
-Once the virtualenv is activated, you can install the required dependencies.
-
-```
-$ pip install -r requirements.txt
-```
-
-At this point you can now synthesize the CloudFormation template for this code.
-
-```
-$ cdk synth
-```
-
-To add additional dependencies, for example other CDK libraries, just add
-them to your `setup.py` file and rerun the `pip install -r requirements.txt`
-command.
-
-## Useful commands
-
- * `cdk ls`          list all stacks in the app
- * `cdk synth`       emits the synthesized CloudFormation template
- * `cdk deploy`      deploy this stack to your default AWS account/region
- * `cdk diff`        compare deployed stack with current state
- * `cdk docs`        open CDK documentation
-
-Enjoy!
+Looks like the `IStage` that's getting passed into the callback doesn't have the `add_action` method, probably because
+the interfaces aren't discovered properly.
